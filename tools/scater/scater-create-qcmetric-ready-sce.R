@@ -5,6 +5,7 @@ library(optparse)
 library(workflowscriptscommon)
 library(scater)
 library(LoomExperiment)
+library(DropletUtils)
 
 # parse options
 #SCE-specific options
@@ -32,11 +33,11 @@ option_list = list(
   ),
   #The scater-specific options
   make_option(
-    c("--assay-name"),
+    c("-e", "--exprs-values"),
     action = "store",
     default = 'counts',
     type = 'character',
-    help= "String specifying the name of the 'assay' of the 'object' that should be used to define expression."
+    help= "String, indicating slot of the 'assays' of the 'object' that should be used to define expression."
   ),
   make_option(
     c("-f", "--mt-controls"),
@@ -90,53 +91,61 @@ if ( ! is.null(opt$col_data) ){
 }
 
 # Now build the object
-assays <- list(as.matrix(reads))
-names(assays) <- c(opt$assay_name)
-scle <- SingleCellLoomExperiment(assays = assays, colData = coldata, rowData = rowdata)
-# Define spikes (if supplied)
 
-
+sce <- SingleCellLoomExperiment(assays = list(counts = as.matrix(reads)), colData = coldata)
 #Scater options
 
 # Check feature_controls (only mitochondrial and ERCC used for now)
-feature_controls_list = list()
-if (! is.null(opt$mt_controls) && opt$mt_controls != 'NULL'){
-  if (! file.exists(opt$mt_controls)){
+
+if (! is.null(opt$mt_controls))
+{
+  if (! file.exists(opt$mt_controls))
+  {
     stop((paste('Supplied feature_controls file', opt$mt_controls, 'does not exist')))
-  } else {
-    mt_controls <- readLines(opt$mt_controls)
-    feature_controls_list[["MT"]] <- mt_controls
+  }else
+  {
+    mts <- readLines(opt$mt_controls)
   }
+}else{
+  mts = NULL
 }
 
-if (! is.null(opt$ercc_controls) && opt$ercc_controls != 'NULL'){
-  if (! file.exists(opt$ercc_controls)){
+if (! is.null(opt$ercc_controls))
+{
+  if (! file.exists(opt$ercc_controls))
+  {
     stop((paste('Supplied feature_controls file', opt$ercc_controls, 'does not exist')))
-  } else {
+  }else{
     ercc_controls <- readLines(opt$ercc_controls)
-    feature_controls_list[["ERCC"]] <- ercc_controls
   }
-} else {
-  ercc_controls <- character()
+}else{
+  ercc_controls = NULL
 }
 
 # Check cell_controls
-cell_controls_list <- list()
-if (! is.null(opt$cell_controls) && opt$cell_controls != 'NULL'){
-  if (! file.exists(opt$cell_controls)){
+
+if (! is.null(opt$cell_controls))
+{
+  if (! file.exists(opt$cell_controls))
+  {
     stop((paste('Supplied feature_controls file', opt$cell_controls, 'does not exist')))
-  } else {
+  }else
+  {
     cell_controls <- readLines(opt$cell_controls)
-    cell_controls_list[["empty"]] <- cell_controls
   }
+}else{
+  cell_controls = NULL
 }
 
 
 # calculate QCMs
-scle  <- calculateQCMetrics(scle, exprs_values = opt$assay_name, feature_controls = feature_controls_list, cell_controls = cell_controls_list)
 
-# Output to a Loom file
+sce <- addPerCellQC(sce, subsets=list(Mito=mts, ERCC=ercc_controls, cell_controls=cell_controls ))
+
+# Output to a serialized R object
 if (file.exists(opt$output_loom)) {
   file.remove(opt$output_loom)
 }
-export(scle, opt$output_loom, format='loom')
+
+export(sce, opt$output_loom, format='loom')
+
