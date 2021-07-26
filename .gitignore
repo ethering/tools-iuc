@@ -52,20 +52,16 @@ target/
 
 *.7z
 *.dmg
-#*.gz
 *.iso
 *.jar
 *.rar
+*.swp
 *.tar
 *.zip
-#*.bz
-.hg
-*.swp
 .DS_Store
+.hg
+.RData
+.Rhistory
 
 tool_test_output.html
 tool_test_output.json
-
-.DS_Store
-
-
